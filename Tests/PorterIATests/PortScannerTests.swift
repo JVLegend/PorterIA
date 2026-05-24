@@ -55,6 +55,33 @@ final class PortScannerTests: XCTestCase {
         XCTAssertEqual(PortScanner.parse("").count, 0)
     }
 
+    /// Regression test for v0.6 bug: `lsof -sTCP:LISTEN` filters by process
+    /// not socket, so established outbound connections leak through when the
+    /// process also has a LISTEN socket. We must skip names containing "->".
+    func test_parse_skipsEstablishedConnections() {
+        let raw = """
+        p12345
+        cChrome Helper
+        Liaparamedicos
+        f5
+        n*:5555
+        TST=LISTEN
+        f6
+        n[2804:7f0:ba00:549::fc52]:61024->[2607:6bc0::10]:443
+        TST=ESTABLISHED
+        f7
+        n[2804:7f0:ba00:549::fc52]:53562->[2800:3f0:4001:808::200a]:443
+        TST=ESTABLISHED
+        """
+        let entries = PortScanner.parse(raw)
+        // Only the *:5555 LISTEN should make it through — the two ->:443 are
+        // established and must be filtered out, otherwise the UI shows port
+        // 443 owned by Chrome Helper (the bug reported in v0.5).
+        XCTAssertEqual(entries.count, 1)
+        XCTAssertEqual(entries.first?.port, 5555)
+        XCTAssertEqual(entries.first?.command, "Chrome Helper")
+    }
+
     // MARK: - dedupe
 
     func test_dedupe_collapsesSamePidSamePort() {

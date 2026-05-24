@@ -52,11 +52,22 @@ struct PortListView: View {
     @ObservedObject var store: PortStore
     @StateObject private var launchAtLogin = LaunchAtLoginController()
     @State private var filter: PortFilter = .all
+    @State private var searchText: String = ""
 
     private var filteredEntries: [PortEntry] {
+        let base: [PortEntry]
         switch filter {
-        case .all: return store.entries
-        case .aiOnly: return store.entries.filter { $0.aiTool != nil }
+        case .all: base = store.entries
+        case .aiOnly: base = store.entries.filter { $0.aiTool != nil }
+        }
+        let q = searchText.trimmingCharacters(in: .whitespaces).lowercased()
+        guard !q.isEmpty else { return base }
+        return base.filter { entry in
+            String(entry.port).contains(q)
+                || entry.command.lowercased().contains(q)
+                || (entry.projectName?.lowercased().contains(q) ?? false)
+                || (entry.aiTool?.displayName.lowercased().contains(q) ?? false)
+                || entry.bindLabel.lowercased().contains(q)
         }
     }
 
@@ -67,6 +78,9 @@ struct PortListView: View {
     var body: some View {
         VStack(spacing: 0) {
             header
+            if store.entries.count > 6 {
+                searchBar
+            }
             Divider()
             content
             if !store.aiProcessesWithoutPort.isEmpty {
@@ -76,8 +90,32 @@ struct PortListView: View {
             Divider()
             footer
         }
-        .frame(width: 340)
+        .frame(width: 360)
         .background(.background)
+    }
+
+    private var searchBar: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "magnifyingglass")
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+            TextField("Filter by port, command, project, AI tool…", text: $searchText)
+                .textFieldStyle(.plain)
+                .font(.system(size: 11))
+            if !searchText.isEmpty {
+                Button {
+                    searchText = ""
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 6)
+        .background(Color.secondary.opacity(0.08))
     }
 
     private var aiProcessSection: some View {
@@ -247,6 +285,7 @@ private struct PortRowView: View {
     let onKill: () -> Void
 
     @State private var hovering = false
+    @State private var copied = false
 
     var body: some View {
         HStack(spacing: 10) {
@@ -274,6 +313,14 @@ private struct PortRowView: View {
 
             Spacer(minLength: 4)
 
+            Button(action: copyURL) {
+                Image(systemName: copied ? "checkmark.circle.fill" : "doc.on.doc")
+                    .font(.system(size: 12))
+                    .foregroundStyle(copied ? Color.green : Color.secondary.opacity(hovering ? 0.8 : 0.5))
+            }
+            .buttonStyle(.plain)
+            .help("Copy http://\(entry.bindLabel == "localhost" || entry.bindLabel == "all interfaces" ? "localhost" : entry.bindLabel):\(entry.port)")
+
             Button(action: onKill) {
                 Image(systemName: "xmark.circle.fill")
                     .font(.system(size: 15))
@@ -287,6 +334,26 @@ private struct PortRowView: View {
         .contentShape(Rectangle())
         .background(hovering ? Color.secondary.opacity(0.08) : Color.clear)
         .onHover { hovering = $0 }
+    }
+
+    /// Copies a usable URL for this port. "all interfaces" and "localhost"
+    /// both resolve to localhost; other hosts copy as literal.
+    private func copyURL() {
+        let host: String
+        switch entry.bindLabel {
+        case "localhost", "all interfaces":
+            host = "localhost"
+        default:
+            host = entry.bindLabel
+        }
+        let url = "http://\(host):\(entry.port)"
+        let pb = NSPasteboard.general
+        pb.clearContents()
+        pb.setString(url, forType: .string)
+        withAnimation { copied = true }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+            withAnimation { copied = false }
+        }
     }
 }
 

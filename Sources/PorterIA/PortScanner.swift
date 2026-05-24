@@ -112,7 +112,13 @@ enum PortScanner {
             case "L":
                 currentUser = value
             case "n":
+                // Skip established connections (format "local:port->remote:port").
+                // `lsof -sTCP:LISTEN` filters by *process*, not socket: if any of the
+                // process's sockets is in LISTEN state, lsof returns ALL its sockets.
+                // That leaks outbound TCP connections into our list (e.g. Chrome
+                // Helper :443 -> remote:443). Defensive filter on the name.
                 guard let pid = currentPid,
+                      !value.contains("->"),
                       let port = extractPort(from: value) else { continue }
                 entries.append(PortEntry(
                     port: port,

@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-05-23
+
+### Added
+- **Search bar** above the port list (auto-shows when there are 7+ ports). Filters by port number, command, project name, AI tool name, or bind label. Real-time, case-insensitive. Clear button (×) inside the field.
+- **Copy URL button** per row. Click to copy `http://localhost:PORT` (or the literal host for non-loopback binds) to clipboard. Brief green checkmark confirmation.
+
+### Fixed
+- **Critical: established TCP connections leaking into port list.** `lsof -sTCP:LISTEN` filters by *process*, not socket — if a process has any LISTEN socket, lsof returns ALL its TCP fds, including ESTABLISHED outbound connections. Result: Chrome Helper / Claude Helper showed up as "owning" port 443 (their outbound HTTPS connections). Defensive filter added: skip names containing `->`. Regression test in `PortScannerTests.test_parse_skipsEstablishedConnections`.
+
+### Changed
+- Default dropdown width grew from 340 to 360pt to accommodate the new copy button.
+
 ## [0.5.0] - 2026-05-23
 
 ### Added
@@ -81,7 +93,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Signed and notarized `.dmg` distribution via the `make release` pipeline.
 - Homebrew Cask `porteria` available through the `jvlegend/porteria` tap.
 
-[Unreleased]: https://github.com/JVLegend/PorterIA/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/JVLegend/PorterIA/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/JVLegend/PorterIA/releases/tag/v0.6.0
 [0.5.0]: https://github.com/JVLegend/PorterIA/releases/tag/v0.5.0
 [0.4.0]: https://github.com/JVLegend/PorterIA/releases/tag/v0.4.0
 [0.3.0]: https://github.com/JVLegend/PorterIA/releases/tag/v0.3.0
