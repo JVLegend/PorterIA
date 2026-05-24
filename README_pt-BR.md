@@ -31,16 +31,6 @@ brew install --cask porteria
 
 > Token do Homebrew Cask: `porteria` (minúsculo, sem hífen). Nome de exibição: `PorterIA`.
 
-## Plano de distribuição
-
-| Canal | Status | Observações |
-|---|---|---|
-| **Homebrew Cask** | principal | Token `porteria` confirmado disponível (404 na API do brew em 2026-05-23). |
-| **GitHub Releases (.dmg notarizado)** | base | Necessário para o Gatekeeper. O Cask aponta para o `.dmg` do release. |
-| **Mac App Store** | pular | O sandbox restringe o `lsof`. Mesmo motivo pelo qual o Portpourri fica fora da MAS. |
-| **npm (helper CLI)** | fase 2 | Apenas se a CLI `port-who` sair do papel. |
-| **pip** | n/a | Público errado, runtime errado para um app de barra de menu. |
-
 ## Layout
 
 ```
