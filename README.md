@@ -1,5 +1,7 @@
 # PorterIA
 
+🇧🇷 [Versão em português](README_pt-BR.md)
+
 macOS menu bar utility — shows which process/project owns each port and offers one-click "Free port" / "Stop server" actions.
 
 Inspired by [Portpourri](https://www.portpourri.com/) (MIT). Independent reimplementation.
