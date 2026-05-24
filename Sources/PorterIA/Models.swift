@@ -18,6 +18,8 @@ struct PortEntry: Identifiable, Hashable {
     /// process matches a known fingerprint. Defaults to nil so existing
     /// memberwise initializers (and tests) keep working.
     var aiTool: AITool? = nil
+    /// CPU and memory percentages for the owning process, if available.
+    var stats: ResourceStats? = nil
 
     /// Human-friendly bind label: "all interfaces", "localhost", or the literal host.
     var bindLabel: String {

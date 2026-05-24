@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-05-23
+
+### Added
+- **📌 Pin/Watchlist** — orange pin icon on each row (hover-only on unpinned, always-visible on pinned). Pinned ports sort to a "PINNED" section at the top. Pinned ports that aren't currently bound show as a faded "(not in use) — pinned — port is free" placeholder so you always know if your favorite port (3000, 5432, etc.) is free without scrolling. Persisted in UserDefaults via `PinStore`.
+- **🗂 Group by project** — toggle in the header (rectangle.3.group icon). When on, unpinned ports group into sections by project name (alphabetical, with "Other" last). Pinned section stays separate at top. Persisted via `@AppStorage`.
+- **📊 CPU/MEM chip per row** — small color-coded chip showing the owning process's current `%cpu`. Color: gray < 20%, orange 20-50%, red ≥ 50%. Memory available but only CPU shown to avoid visual clutter (memory exposed via `entry.stats`).
+- New `ResourceStatsFetcher` batches `ps -p PID1,PID2 -o pid=,%cpu=,%mem=` in one call. 4 unit tests.
+- New `PinStore` `ObservableObject` wraps the persisted Set\<Int\> with `toggle()` / `isPinned()`.
+
+### Changed
+- Test suite at 49 tests (+4 for ResourceStatsFetcher).
+
 ## [0.6.0] - 2026-05-23
 
 ### Added
@@ -93,7 +105,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Signed and notarized `.dmg` distribution via the `make release` pipeline.
 - Homebrew Cask `porteria` available through the `jvlegend/porteria` tap.
 
-[Unreleased]: https://github.com/JVLegend/PorterIA/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/JVLegend/PorterIA/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/JVLegend/PorterIA/releases/tag/v0.7.0
 [0.6.0]: https://github.com/JVLegend/PorterIA/releases/tag/v0.6.0
 [0.5.0]: https://github.com/JVLegend/PorterIA/releases/tag/v0.5.0
 [0.4.0]: https://github.com/JVLegend/PorterIA/releases/tag/v0.4.0

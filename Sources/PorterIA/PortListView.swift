@@ -1,10 +1,9 @@
 import SwiftUI
+import AppKit
 
 @MainActor
 final class PortStore: ObservableObject {
     @Published var entries: [PortEntry] = []
-    /// AI tools that are running but don't own a listening TCP port
-    /// (e.g. Claude Desktop, Codex Desktop using stdio).
     @Published var aiProcessesWithoutPort: [AIProcess] = []
     @Published var lastRefresh: Date = Date()
     private var timer: Timer?
@@ -51,8 +50,10 @@ enum PortFilter: String, CaseIterable, Identifiable {
 struct PortListView: View {
     @ObservedObject var store: PortStore
     @StateObject private var launchAtLogin = LaunchAtLoginController()
+    @StateObject private var pinStore = PinStore()
     @State private var filter: PortFilter = .all
     @State private var searchText: String = ""
+    @AppStorage("PorterIA.groupByProject") private var groupByProject: Bool = false
 
     private var filteredEntries: [PortEntry] {
         let base: [PortEntry]
@@ -75,6 +76,42 @@ struct PortListView: View {
         store.entries.filter { $0.aiTool != nil }.count
     }
 
+    /// Pinned ports that are currently bound — they get the regular row UI.
+    private var activePinnedEntries: [PortEntry] {
+        filteredEntries.filter { pinStore.isPinned($0.port) }
+            .sorted { $0.port < $1.port }
+    }
+
+    /// Pinned ports that are NOT currently bound — rendered as faded placeholder rows.
+    private var inactivePinnedPorts: [Int] {
+        let active = Set(activePinnedEntries.map(\.port))
+        return pinStore.pinned.subtracting(active).sorted()
+    }
+
+    /// Everything not pinned.
+    private var unpinnedEntries: [PortEntry] {
+        filteredEntries.filter { !pinStore.isPinned($0.port) }
+    }
+
+    /// Groups of unpinned entries by projectName (when groupByProject is on).
+    private var groupedUnpinned: [(name: String, entries: [PortEntry])] {
+        guard groupByProject else { return [] }
+        var byProject: [String: [PortEntry]] = [:]
+        for entry in unpinnedEntries {
+            let key = entry.projectName ?? "__OTHER__"
+            byProject[key, default: []].append(entry)
+        }
+        return byProject.map { (key, entries) in
+            (name: key == "__OTHER__" ? "Other" : key,
+             entries: entries.sorted { $0.port < $1.port })
+        }.sorted { lhs, rhs in
+            // "Other" always last
+            if lhs.name == "Other" { return false }
+            if rhs.name == "Other" { return true }
+            return lhs.name.localizedCaseInsensitiveCompare(rhs.name) == .orderedAscending
+        }
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             header
@@ -92,6 +129,62 @@ struct PortListView: View {
         }
         .frame(width: 360)
         .background(.background)
+    }
+
+    private var header: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "network")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(.tint)
+            Text("PorterIA")
+                .font(.system(size: 13, weight: .semibold))
+
+            if aiCount > 0 {
+                Text("\(aiCount) AI")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 5)
+                    .padding(.vertical, 1)
+                    .background(
+                        RoundedRectangle(cornerRadius: 4)
+                            .fill(Color.purple.opacity(0.85))
+                    )
+            }
+
+            Spacer()
+
+            Button {
+                groupByProject.toggle()
+            } label: {
+                Image(systemName: groupByProject ? "rectangle.3.group.fill" : "rectangle.3.group")
+                    .font(.system(size: 11))
+                    .foregroundStyle(groupByProject ? Color.accentColor : Color.secondary)
+            }
+            .buttonStyle(.plain)
+            .help(groupByProject ? "Ungroup" : "Group by project")
+
+            Picker("", selection: $filter) {
+                ForEach(PortFilter.allCases) { f in
+                    Text(f.rawValue).tag(f)
+                }
+            }
+            .pickerStyle(.segmented)
+            .frame(width: 84)
+            .controlSize(.mini)
+
+            Text("\(filteredEntries.count)")
+                .font(.system(size: 11, weight: .semibold))
+                .monospacedDigit()
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 6)
+                .padding(.vertical, 1)
+                .background(
+                    RoundedRectangle(cornerRadius: 4)
+                        .fill(Color.secondary.opacity(0.15))
+                )
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
     }
 
     private var searchBar: some View {
@@ -118,6 +211,95 @@ struct PortListView: View {
         .background(Color.secondary.opacity(0.08))
     }
 
+    private static let rowHeight: CGFloat = 46
+    private static let minVisibleRows: CGFloat = 4
+    private static let maxVisibleRows: CGFloat = 8
+
+    @ViewBuilder
+    private var content: some View {
+        if filteredEntries.isEmpty && inactivePinnedPorts.isEmpty {
+            emptyState
+        } else {
+            ScrollView {
+                LazyVStack(spacing: 0) {
+                    if !activePinnedEntries.isEmpty || !inactivePinnedPorts.isEmpty {
+                        sectionHeader("Pinned")
+                        ForEach(activePinnedEntries) { entry in
+                            PortRowView(
+                                entry: entry,
+                                isPinned: true,
+                                onKill: { store.kill(entry) },
+                                onTogglePin: { pinStore.toggle(entry.port) }
+                            )
+                            Divider().padding(.leading, 12)
+                        }
+                        ForEach(inactivePinnedPorts, id: \.self) { port in
+                            PinnedEmptyRow(port: port) { pinStore.toggle(port) }
+                            Divider().padding(.leading, 12)
+                        }
+                    }
+
+                    if groupByProject {
+                        ForEach(groupedUnpinned, id: \.name) { group in
+                            sectionHeader(group.name)
+                            ForEach(group.entries) { entry in
+                                PortRowView(
+                                    entry: entry,
+                                    isPinned: false,
+                                    onKill: { store.kill(entry) },
+                                    onTogglePin: { pinStore.toggle(entry.port) }
+                                )
+                                Divider().padding(.leading, 12)
+                            }
+                        }
+                    } else {
+                        ForEach(Array(unpinnedEntries.enumerated()), id: \.element.id) { index, entry in
+                            PortRowView(
+                                entry: entry,
+                                isPinned: false,
+                                onKill: { store.kill(entry) },
+                                onTogglePin: { pinStore.toggle(entry.port) }
+                            )
+                            if index < unpinnedEntries.count - 1 {
+                                Divider().padding(.leading, 12)
+                            }
+                        }
+                    }
+                }
+            }
+            .frame(
+                minHeight: Self.rowHeight * Self.minVisibleRows,
+                maxHeight: Self.rowHeight * Self.maxVisibleRows
+            )
+        }
+    }
+
+    private func sectionHeader(_ title: String) -> some View {
+        HStack {
+            Text(title)
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(.secondary)
+                .textCase(.uppercase)
+            Spacer()
+        }
+        .padding(.horizontal, 12)
+        .padding(.top, 6)
+        .padding(.bottom, 2)
+    }
+
+    private var emptyState: some View {
+        VStack(spacing: 6) {
+            Image(systemName: filter == .aiOnly ? "sparkles" : "checkmark.circle")
+                .font(.system(size: 22))
+                .foregroundStyle(.secondary)
+            Text(filter == .aiOnly ? "No AI tools detected" : "No listening TCP ports")
+                .font(.system(size: 12))
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 24)
+    }
+
     private var aiProcessSection: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 6) {
@@ -142,92 +324,6 @@ struct PortListView: View {
                 AIProcessRow(process: proc) { store.killProcess(pid: proc.pid) }
             }
         }
-    }
-
-    private var header: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "network")
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(.tint)
-            Text("PorterIA")
-                .font(.system(size: 13, weight: .semibold))
-
-            if aiCount > 0 {
-                Text("\(aiCount) AI")
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 5)
-                    .padding(.vertical, 1)
-                    .background(
-                        RoundedRectangle(cornerRadius: 4)
-                            .fill(Color.purple.opacity(0.85))
-                    )
-            }
-
-            Spacer()
-
-            Picker("", selection: $filter) {
-                ForEach(PortFilter.allCases) { f in
-                    Text(f.rawValue).tag(f)
-                }
-            }
-            .pickerStyle(.segmented)
-            .frame(width: 100)
-            .controlSize(.mini)
-
-            Text("\(filteredEntries.count)")
-                .font(.system(size: 11, weight: .semibold))
-                .monospacedDigit()
-                .foregroundStyle(.secondary)
-                .padding(.horizontal, 6)
-                .padding(.vertical, 1)
-                .background(
-                    RoundedRectangle(cornerRadius: 4)
-                        .fill(Color.secondary.opacity(0.15))
-                )
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 10)
-    }
-
-    private static let rowHeight: CGFloat = 46
-    private static let minVisibleRows: CGFloat = 4
-    private static let maxVisibleRows: CGFloat = 8
-
-    @ViewBuilder
-    private var content: some View {
-        let list = filteredEntries
-        if list.isEmpty {
-            emptyState
-        } else {
-            ScrollView {
-                LazyVStack(spacing: 0) {
-                    ForEach(Array(list.enumerated()), id: \.element.id) { index, entry in
-                        PortRowView(entry: entry) { store.kill(entry) }
-                        if index < list.count - 1 {
-                            Divider().padding(.leading, 12)
-                        }
-                    }
-                }
-            }
-            .frame(
-                minHeight: Self.rowHeight * Self.minVisibleRows,
-                maxHeight: Self.rowHeight * Self.maxVisibleRows
-            )
-        }
-    }
-
-    private var emptyState: some View {
-        VStack(spacing: 6) {
-            Image(systemName: filter == .aiOnly ? "sparkles" : "checkmark.circle")
-                .font(.system(size: 22))
-                .foregroundStyle(.secondary)
-            Text(filter == .aiOnly ? "No AI tools detected" : "No listening TCP ports")
-                .font(.system(size: 12))
-                .foregroundStyle(.secondary)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 24)
     }
 
     private var footer: some View {
@@ -278,11 +374,13 @@ struct PortListView: View {
     }
 }
 
-// MARK: - Row
+// MARK: - Port row
 
 private struct PortRowView: View {
     let entry: PortEntry
+    let isPinned: Bool
     let onKill: () -> Void
+    let onTogglePin: () -> Void
 
     @State private var hovering = false
     @State private var copied = false
@@ -304,14 +402,31 @@ private struct PortRowView: View {
                         .lineLimit(1)
                         .truncationMode(.tail)
                 }
-                Text(entry.secondaryLabel)
-                    .font(.system(size: 10))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
+                HStack(spacing: 6) {
+                    Text(entry.secondaryLabel)
+                        .font(.system(size: 10))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                    if let s = entry.stats {
+                        StatsChip(stats: s)
+                    }
+                }
             }
 
             Spacer(minLength: 4)
+
+            // Pin button — always visible if pinned, hover-only if not
+            if isPinned || hovering {
+                Button(action: onTogglePin) {
+                    Image(systemName: isPinned ? "pin.fill" : "pin")
+                        .font(.system(size: 11))
+                        .foregroundStyle(isPinned ? Color.orange : Color.secondary.opacity(0.6))
+                        .rotationEffect(.degrees(45))
+                }
+                .buttonStyle(.plain)
+                .help(isPinned ? "Unpin" : "Pin this port")
+            }
 
             Button(action: copyURL) {
                 Image(systemName: copied ? "checkmark.circle.fill" : "doc.on.doc")
@@ -319,7 +434,7 @@ private struct PortRowView: View {
                     .foregroundStyle(copied ? Color.green : Color.secondary.opacity(hovering ? 0.8 : 0.5))
             }
             .buttonStyle(.plain)
-            .help("Copy http://\(entry.bindLabel == "localhost" || entry.bindLabel == "all interfaces" ? "localhost" : entry.bindLabel):\(entry.port)")
+            .help("Copy http://\(hostForCopy):\(entry.port)")
 
             Button(action: onKill) {
                 Image(systemName: "xmark.circle.fill")
@@ -336,17 +451,15 @@ private struct PortRowView: View {
         .onHover { hovering = $0 }
     }
 
-    /// Copies a usable URL for this port. "all interfaces" and "localhost"
-    /// both resolve to localhost; other hosts copy as literal.
-    private func copyURL() {
-        let host: String
+    private var hostForCopy: String {
         switch entry.bindLabel {
-        case "localhost", "all interfaces":
-            host = "localhost"
-        default:
-            host = entry.bindLabel
+        case "localhost", "all interfaces": return "localhost"
+        default: return entry.bindLabel
         }
-        let url = "http://\(host):\(entry.port)"
+    }
+
+    private func copyURL() {
+        let url = "http://\(hostForCopy):\(entry.port)"
         let pb = NSPasteboard.general
         pb.clearContents()
         pb.setString(url, forType: .string)
@@ -357,12 +470,90 @@ private struct PortRowView: View {
     }
 }
 
-/// Compact row for AI tools running without a listening TCP port.
-/// Lives under the main port list, between the divider and the footer.
+// MARK: - Pinned-but-not-bound row
+
+private struct PinnedEmptyRow: View {
+    let port: Int
+    let onUnpin: () -> Void
+    @State private var hovering = false
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Text("\(port)")
+                .font(.system(size: 15, weight: .semibold, design: .monospaced))
+                .monospacedDigit()
+                .foregroundStyle(.secondary)
+                .frame(width: 56, alignment: .leading)
+
+            VStack(alignment: .leading, spacing: 1) {
+                Text("(not in use)")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(.secondary)
+                Text("pinned — port is free")
+                    .font(.system(size: 10))
+                    .foregroundStyle(.tertiary)
+            }
+
+            Spacer(minLength: 4)
+
+            Button(action: onUnpin) {
+                Image(systemName: "pin.fill")
+                    .font(.system(size: 11))
+                    .foregroundStyle(Color.orange)
+                    .rotationEffect(.degrees(45))
+            }
+            .buttonStyle(.plain)
+            .help("Unpin")
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .contentShape(Rectangle())
+        .background(hovering ? Color.secondary.opacity(0.06) : Color.clear)
+        .onHover { hovering = $0 }
+        .opacity(0.75)
+    }
+}
+
+// MARK: - Stats chip (CPU/MEM)
+
+private struct StatsChip: View {
+    let stats: ResourceStats
+
+    var body: some View {
+        HStack(spacing: 3) {
+            Image(systemName: "cpu")
+                .font(.system(size: 8))
+            Text(format(stats.cpuPercent) + "%")
+                .font(.system(size: 9, design: .monospaced))
+                .monospacedDigit()
+        }
+        .foregroundStyle(cpuColor)
+        .padding(.horizontal, 3)
+        .padding(.vertical, 0.5)
+        .background(
+            RoundedRectangle(cornerRadius: 3)
+                .fill(cpuColor.opacity(0.12))
+        )
+    }
+
+    private var cpuColor: Color {
+        switch stats.cpuPercent {
+        case 50...: return .red
+        case 20..<50: return .orange
+        default: return .secondary
+        }
+    }
+
+    private func format(_ v: Double) -> String {
+        v < 10 ? String(format: "%.1f", v) : String(Int(v.rounded()))
+    }
+}
+
+// MARK: - AI process row (no-port section)
+
 private struct AIProcessRow: View {
     let process: AIProcess
     let onKill: () -> Void
-
     @State private var hovering = false
 
     var body: some View {
@@ -395,9 +586,8 @@ private struct AIProcessRow: View {
     }
 }
 
-/// Small colored capsule shown next to the primary label when the row's
-/// process matches a known AI tool. Colored per category to make the type
-/// scannable at a glance.
+// MARK: - AI badge
+
 private struct AIBadge: View {
     let category: AIToolCategory
 

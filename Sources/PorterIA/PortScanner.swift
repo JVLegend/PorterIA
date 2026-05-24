@@ -9,6 +9,7 @@ enum PortScanner {
         let pidSet = Set(entries.map(\.pid))
         let cwdMap = fetchCwds(for: pidSet)
         let cmdMap = AIToolFingerprinter.cmdlines(for: pidSet)
+        let statsMap = ResourceStatsFetcher.fetch(for: pidSet)
         entries = entries.map { entry in
             let cwd = cwdMap[entry.pid]
             let (root, name) = cwd.flatMap(ProjectDetector.detect) ?? (nil, nil)
@@ -21,7 +22,8 @@ enum PortScanner {
                 bindAddress: entry.bindAddress,
                 projectPath: root,
                 projectName: name,
-                aiTool: aiTool
+                aiTool: aiTool,
+                stats: statsMap[entry.pid]
             )
         }
         return entries
