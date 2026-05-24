@@ -160,14 +160,15 @@ private struct PortRowView: View {
                 .frame(width: 56, alignment: .leading)
 
             VStack(alignment: .leading, spacing: 1) {
-                Text(entry.command)
+                Text(entry.primaryLabel)
                     .font(.system(size: 12, weight: .medium))
                     .lineLimit(1)
                     .truncationMode(.tail)
-                Text("pid \(entry.pid) · \(entry.bindLabel)")
+                Text(entry.secondaryLabel)
                     .font(.system(size: 10))
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
+                    .truncationMode(.middle)
             }
 
             Spacer(minLength: 4)

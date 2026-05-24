@@ -8,6 +8,12 @@ let package = Package(
         .executableTarget(
             name: "PorterIA",
             path: "Sources/PorterIA"
+        ),
+        .testTarget(
+            name: "PorterIATests",
+            dependencies: ["PorterIA"],
+            path: "Tests/PorterIATests",
+            resources: [.process("Fixtures")]
         )
     ]
 )

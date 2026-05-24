@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-05-23
+
+### Added
+- **Project mapping**: each row now shows the owning project (from `package.json` "name" or directory basename) when detectable. Walks up from each process's cwd looking for `package.json`, `pyproject.toml`, `Cargo.toml`, `go.mod`, `Gemfile`, or `.git`.
+- `ProjectDetector` enum with up-to-10-levels ancestor walk.
+- `cwd` lookup via batched `lsof -p PID1,PID2,... -d cwd`.
+- XCTest suite (`PorterIATests`) covering port extraction, lsof parsing, dedupe, bind label humanization, primary/secondary label rendering, and project detection (15 tests).
+- `Tests/PorterIATests/Fixtures/lsof_listen_sample.txt` fixture from real lsof output.
+
+### Fixed
+- `PortEntry.bindLabel` now correctly humanizes IPv6 `[::1]:8080` as `localhost` (previously rendered `[:1]` because `split(separator: ":")` was eating the `::`).
+
+### Changed
+- `PortEntry` gained `projectPath` and `projectName` fields.
+- `PortListView` displays project name (when present) as the primary label, with the command moved into the secondary line.
+
 ## [0.2.0] - 2026-05-23
 
 ### Added
@@ -33,6 +49,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Signed and notarized `.dmg` distribution via the `make release` pipeline.
 - Homebrew Cask `porteria` available through the `jvlegend/porteria` tap.
 
-[Unreleased]: https://github.com/JVLegend/PorterIA/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/JVLegend/PorterIA/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/JVLegend/PorterIA/releases/tag/v0.3.0
 [0.2.0]: https://github.com/JVLegend/PorterIA/releases/tag/v0.2.0
 [0.1.0]: https://github.com/JVLegend/PorterIA/releases/tag/v0.1.0
