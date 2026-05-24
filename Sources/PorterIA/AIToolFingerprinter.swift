@@ -28,8 +28,18 @@ enum AIToolFingerprinter {
         ("LM Studio",         .llmServer,    [#"LM Studio\.app"#, #"\blms-server\b"#, #"\blmstudio\b"#]),
         ("vLLM",              .llmServer,    [#"vllm\.entrypoints"#, #"-m vllm\b"#]),
 
-        // Agents / CLIs
-        ("Claude Code",       .aiAgent,      [#"@anthropic-ai/claude-code"#, #"\.claude/local"#, #"/bin/claude\b"#]),
+        // Desktop apps (matched FIRST so app processes don't get tagged as CLIs)
+        ("Claude Desktop",    .desktopApp,   [#"^/Applications/Claude\.app/Contents/MacOS/Claude( |$)"#]),
+        ("Codex Desktop",     .desktopApp,   [#"/Applications/Codex\.app/Contents/(MacOS/Codex|Resources/codex|Resources/node_repl)"#]),
+
+        // Agents / CLIs (catches the embedded Claude Code that ships inside Claude.app too)
+        ("Claude Code",       .aiAgent,      [
+            #"@anthropic-ai/claude-code"#,
+            #"\.claude/local"#,
+            #"/bin/claude\b"#,
+            #"Claude\.app/Contents/Helpers/disclaimer"#,
+            #"Application Support/Claude/claude-code/"#,
+        ]),
         ("Codex CLI",         .aiAgent,      [#"@openai/codex"#, #"/bin/codex\b"#]),
         ("Aider",             .aiAgent,      [#"\baider-chat\b"#, #"-m aider\b"#, #"/bin/aider\b"#]),
         ("Goose",             .aiAgent,      [#"block/goose"#, #"\bgoosed\b"#]),
@@ -43,9 +53,6 @@ enum AIToolFingerprinter {
 
         // Proxies
         ("LiteLLM",           .aiProxy,      [#"\blitellm\b"#]),
-
-        // Desktop apps
-        ("Claude Desktop",    .desktopApp,   [#"Claude\.app/Contents/MacOS/Claude"#]),
 
         // Notebooks / remote dev
         ("Jupyter",           .notebook,     [#"jupyter-notebook"#, #"jupyter-lab"#, #"jupyter-server"#, #"-m notebook\b"#, #"-m jupyterlab\b"#]),

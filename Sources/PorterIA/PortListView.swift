@@ -3,6 +3,9 @@ import SwiftUI
 @MainActor
 final class PortStore: ObservableObject {
     @Published var entries: [PortEntry] = []
+    /// AI tools that are running but don't own a listening TCP port
+    /// (e.g. Claude Desktop, Codex Desktop using stdio).
+    @Published var aiProcessesWithoutPort: [AIProcess] = []
     @Published var lastRefresh: Date = Date()
     private var timer: Timer?
 
@@ -16,8 +19,11 @@ final class PortStore: ObservableObject {
     func refresh() {
         Task.detached(priority: .userInitiated) {
             let scanned = PortScanner.scan()
+            let portPids = Set(scanned.map(\.pid))
+            let aiOnly = AIProcessScanner.scan(excluding: portPids)
             await MainActor.run {
                 self.entries = scanned
+                self.aiProcessesWithoutPort = aiOnly
                 self.lastRefresh = Date()
             }
         }
@@ -25,6 +31,11 @@ final class PortStore: ObservableObject {
 
     func kill(_ entry: PortEntry) {
         _ = ProcessKiller.terminate(pid: entry.pid)
+        refresh()
+    }
+
+    func killProcess(pid: Int32) {
+        _ = ProcessKiller.terminate(pid: pid)
         refresh()
     }
 }
@@ -58,11 +69,41 @@ struct PortListView: View {
             header
             Divider()
             content
+            if !store.aiProcessesWithoutPort.isEmpty {
+                Divider()
+                aiProcessSection
+            }
             Divider()
             footer
         }
         .frame(width: 340)
         .background(.background)
+    }
+
+    private var aiProcessSection: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 6) {
+                Image(systemName: "sparkles")
+                    .font(.system(size: 10))
+                    .foregroundStyle(.purple)
+                Text("AI tools active (no port)")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(.secondary)
+                    .textCase(.uppercase)
+                Spacer()
+                Text("\(store.aiProcessesWithoutPort.count)")
+                    .font(.system(size: 10, weight: .semibold))
+                    .monospacedDigit()
+                    .foregroundStyle(.secondary)
+            }
+            .padding(.horizontal, 12)
+            .padding(.top, 6)
+            .padding(.bottom, 2)
+
+            ForEach(store.aiProcessesWithoutPort) { proc in
+                AIProcessRow(process: proc) { store.killProcess(pid: proc.pid) }
+            }
+        }
     }
 
     private var header: some View {
@@ -243,6 +284,44 @@ private struct PortRowView: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
+        .contentShape(Rectangle())
+        .background(hovering ? Color.secondary.opacity(0.08) : Color.clear)
+        .onHover { hovering = $0 }
+    }
+}
+
+/// Compact row for AI tools running without a listening TCP port.
+/// Lives under the main port list, between the divider and the footer.
+private struct AIProcessRow: View {
+    let process: AIProcess
+    let onKill: () -> Void
+
+    @State private var hovering = false
+
+    var body: some View {
+        HStack(spacing: 8) {
+            AIBadge(category: process.aiTool.category)
+            VStack(alignment: .leading, spacing: 0) {
+                Text(process.aiTool.displayName)
+                    .font(.system(size: 12, weight: .medium))
+                    .lineLimit(1)
+                Text("\(process.command) · pid \(process.pid)")
+                    .font(.system(size: 10))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+            }
+            Spacer(minLength: 4)
+            Button(action: onKill) {
+                Image(systemName: "xmark.circle.fill")
+                    .font(.system(size: 13))
+                    .foregroundStyle(hovering ? Color.red : Color.secondary.opacity(0.5))
+            }
+            .buttonStyle(.plain)
+            .help("Kill pid \(process.pid) (SIGTERM)")
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 5)
         .contentShape(Rectangle())
         .background(hovering ? Color.secondary.opacity(0.08) : Color.clear)
         .onHover { hovering = $0 }

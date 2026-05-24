@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-05-23
+
+### Added
+- **"AI tools active (no port)" section** below the main port list. Shows AI applications that are running but don't listen on a TCP port (Claude Desktop, Codex Desktop talking over stdio, etc.). One row per detected tool with kill button.
+- `AIProcess` model + `AIProcessScanner` that walks `ps -A -o pid=,args=` and fingerprints every running process. Dedupes by tool display name (lowest PID wins) so Electron helpers don't spam the UI.
+- `PortStore.aiProcessesWithoutPort` published property, excludes any PID already shown in the port list.
+
+### Changed
+- **AI catalog updated for real cmdlines.** Captured the actual `ps` output from a live Claude Desktop + Codex Desktop install and adjusted regexes:
+  - `Claude Desktop` now anchored to `^/Applications/Claude.app/Contents/MacOS/Claude` so Electron helpers (renderer, GPU, network) don't match.
+  - `Codex Desktop` (new) matches `/Applications/Codex.app/Contents/{MacOS/Codex,Resources/codex,Resources/node_repl}`.
+  - `Claude Code` now also catches the disclaimer wrapper that Claude Desktop spawns to run an embedded Claude Code, and the inner `Application Support/Claude/claude-code/` binary.
+  - Catalog order: Desktop apps matched **before** CLI patterns so a Codex Desktop subprocess gets tagged as Desktop, not CLI.
+- 9 new tests in `AIProcessScannerTests` covering Electron-helper rejection, dedupe, and Desktop-vs-CLI disambiguation. Suite at 44 total.
+
 ## [0.4.0] - 2026-05-23
 
 ### Added
@@ -66,7 +81,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Signed and notarized `.dmg` distribution via the `make release` pipeline.
 - Homebrew Cask `porteria` available through the `jvlegend/porteria` tap.
 
-[Unreleased]: https://github.com/JVLegend/PorterIA/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/JVLegend/PorterIA/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/JVLegend/PorterIA/releases/tag/v0.5.0
 [0.4.0]: https://github.com/JVLegend/PorterIA/releases/tag/v0.4.0
 [0.3.0]: https://github.com/JVLegend/PorterIA/releases/tag/v0.3.0
 [0.2.0]: https://github.com/JVLegend/PorterIA/releases/tag/v0.2.0
