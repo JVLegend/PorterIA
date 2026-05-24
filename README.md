@@ -1,71 +1,185 @@
-# PorterIA
+<div align="center">
+
+# 🌐 PorterIA
+
+**Utilitário de barra de menu para macOS que mostra qual processo, qual projeto e qual ferramenta de IA está usando cada porta da sua máquina.**
+
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Release](https://img.shields.io/github/v/release/JVLegend/PorterIA?color=green)](https://github.com/JVLegend/PorterIA/releases/latest)
+[![Platform](https://img.shields.io/badge/macOS-14%2B-lightgrey)](https://www.apple.com/macos)
+[![Swift](https://img.shields.io/badge/swift-6.3-orange.svg)](https://swift.org)
+[![Universal](https://img.shields.io/badge/arch-arm64%20%2B%20x86__64-purple)]()
 
 🇺🇸 [English version](README_en.md)
 
-Utilitário de barra de menu para macOS — mostra qual processo/projeto é dono de cada porta e oferece ações de um clique como "Liberar porta" / "Parar servidor".
+</div>
 
-## Stack
+> *Acabou o "EADDRINUSE :3000". Sempre que uma porta está ocupada, você vê quem é dono e mata com um clique.*
 
-- Swift + SwiftUI (`MenuBarExtra`, macOS 14+)
-- Target executável SwiftPM (sem `.xcodeproj`)
-- Usa `lsof -i -P -n -sTCP:LISTEN -F pcnLT` para descoberta de portas (sem privilégios elevados)
-- Sem rede, sem telemetria
-- CLI complementar opcional em Node (`port-who`) para uso headless / scripting — fase 2
+---
 
-## Build & execução local
+## ✨ Recursos
 
-```sh
-make run         # swift run (debug, em primeiro plano)
-make app         # build release do .app em ./build/PorterIA.app
-open build/PorterIA.app
-make clean
-```
+| | |
+|---|---|
+| 🔌 **Mapa de portas em tempo real** | Toda porta TCP em escuta, com processo, PID e endereço de bind |
+| 🤖 **Detecção de ferramentas de IA** | Ollama, Claude Code, Codex, LM Studio, Continue.dev, Copilot, Cursor, Aider, vLLM, LiteLLM, Jupyter e mais — todas com badge colorido |
+| 📦 **Identificação automática de projeto** | Lê `package.json` (campo `"name"`), `Cargo.toml`, `pyproject.toml`, `go.mod`, `Gemfile`, ou `.git` |
+| ⚡ **Encerrar processo com um clique** | `SIGTERM` direto pelo dropdown — sem `lsof \| grep \| kill` |
+| 🚀 **Iniciar no login** | Toggle integrado via `SMAppService` |
+| 🔄 **Auto-refresh a cada 5 segundos** | Mais `⌘R` pra atualização manual |
+| 💎 **Universal binary** | Roda nativo em Apple Silicon e Intel |
+| 🔒 **Privacidade total** | Sem rede, sem telemetria, sem privilégio elevado, sem disco. Só `lsof` + `kill(2)` |
+| ✅ **Assinado e notarizado pela Apple** | Distribuído via Developer ID, sem bloqueio do Gatekeeper |
 
-O app aparece na barra de menu (sem ícone na dock — `LSUIElement` está ativo). Clique no ícone de rede para ver as portas em escuta; o refresh é automático a cada 5s.
+---
 
-## Instalação
+## 📦 Instalação
 
-Via Homebrew Cask:
+### Via Homebrew Cask (recomendado)
 
 ```sh
 brew tap jvlegend/porteria
 brew install --cask porteria
 ```
 
-Ou baixe o `.dmg` mais recente (assinado e notarizado pela Apple) na [página de Releases](https://github.com/JVLegend/PorterIA/releases/latest) e arraste o `PorterIA.app` para `/Applications`.
+Atualizações futuras:
+```sh
+brew upgrade --cask porteria
+```
 
-Requer macOS 14 (Sonoma) ou superior. Binário universal — roda nativamente em Macs Apple Silicon e Intel.
+### Download direto
 
-## Como usar
+Baixe o `.dmg` mais recente em [Releases](https://github.com/JVLegend/PorterIA/releases/latest) e arraste `PorterIA.app` para `/Applications`.
 
-O PorterIA vive na barra de menu — **não há ícone na dock e não há janela principal**. Depois de instalar, abra uma vez a partir de `/Applications` (ou via `open -a PorterIA`) e procure pelo ícone de rede (🌐 na parte superior direita da tela).
+> **Requisitos:** macOS 14 (Sonoma) ou superior. Universal binary — Apple Silicon **e** Intel.
 
-Clique no ícone para abrir o menu suspenso. Você vai ver:
+---
 
-- Todas as portas TCP em escuta na sua máquina, ordenadas por número
-- O **nome do processo** e o PID que detêm cada porta
-- O **nome do projeto**, quando detectável (lê o campo `"name"` de `package.json`, ou o nome do diretório que tem o ancestral mais próximo com `Cargo.toml` / `pyproject.toml` / `go.mod` / `Gemfile` / `.git`)
-- O **endereço de bind**, traduzido: `localhost`, `todas as interfaces`, ou o host literal
+## 🚀 Como usar
 
-Ações:
+O PorterIA vive na **barra de menu** — não há ícone na dock e não há janela principal. Depois de instalar:
 
-- **Encerrar um processo** — clique no botão vermelho `×` na linha. Envia `SIGTERM` para o PID dono. A lista atualiza imediatamente.
-- **Atualizar manualmente** — clique em *Refresh* no rodapé ou pressione `⌘R`. A lista também atualiza automaticamente a cada 5 segundos enquanto aberta.
-- **Sair do PorterIA** — clique em *Quit* no rodapé ou pressione `⌘Q`.
-- **Abrir no login** — atualmente manual: arraste o `PorterIA.app` para *Ajustes do Sistema → Geral → Itens de Início de Sessão → Abrir no Login*. (Toggle nativo chegando na v0.4.0.)
+```sh
+open -a PorterIA
+```
 
-Privacidade: o PorterIA **não faz nenhuma chamada de rede**, **não pede privilégios elevados**, não armazena nada em disco e não contém telemetria. Os únicos comandos externos invocados são `lsof` e `kill(2)`, ambos ferramentas padrão do macOS.
+Procure pelo ícone de rede (🌐) no canto superior direito da tela. Clique pra abrir o dropdown.
 
-## Layout
+### O que cada linha mostra
+
+```
+:11434  🟠 AI  Ollama
+        ollama · pid 1234 · localhost                              ×
+
+:3000   📦  my-next-app
+        node · pid 5678 · all interfaces                           ×
+
+:5432       postgres
+        pid 9012 · localhost                                       ×
+```
+
+- 🟠 **Badge AI** (cor varia por categoria): processo identificado como ferramenta de IA
+- 📦 **Nome do projeto**: detectado a partir do diretório de trabalho do processo
+- **Sem badge**: serviço comum do sistema
+
+### Ações
+
+| Ação | Como |
+|---|---|
+| **Encerrar processo** | Clique no `×` vermelho na linha → envia `SIGTERM` ao PID |
+| **Filtrar só IA** | Toggle `All` ⇄ `AI` no header |
+| **Atualizar manualmente** | Botão **Refresh** no rodapé ou `⌘R` |
+| **Iniciar no login** | Toggle **Start at login** no rodapé |
+| **Sair** | Botão **Quit** no rodapé ou `⌘Q` |
+
+### Catálogo de IA detectada
+
+| Categoria | Ferramentas |
+|---|---|
+| 🟠 **Servidor LLM** | Ollama, LM Studio, vLLM |
+| 🟣 **Agente CLI** | Claude Code, Codex CLI, Aider, Goose, Open Interpreter |
+| 🔵 **Extensão IDE** | Continue.dev, GitHub Copilot, Cursor, Tabby |
+| 🟢 **App desktop** | Claude Desktop |
+| 🩷 **Notebook** | Jupyter |
+| ⚪ **Dev remoto** | VS Code Server / Tunnel |
+| 🌊 **Proxy LLM** | LiteLLM |
+
+Não viu sua ferramenta? [Abre uma issue](https://github.com/JVLegend/PorterIA/issues/new) — adicionar nova ferramenta é literalmente uma linha em [`AIToolFingerprinter.swift`](Sources/PorterIA/AIToolFingerprinter.swift).
+
+---
+
+## 🔒 Privacidade
+
+| Item | Status |
+|---|---|
+| Conexões de rede de saída | ❌ **Nunca** |
+| Telemetria / analytics | ❌ **Nunca** |
+| Acesso a disco persistente | ❌ **Nada** (sem cache, sem config gravada) |
+| Privilégios elevados (sudo / TCC) | ❌ **Não pede** |
+| Ferramentas externas chamadas | ✅ Apenas `/usr/sbin/lsof` e `kill(2)` (POSIX, ambos padrão do macOS) |
+| Código fechado | ❌ Tudo MIT, leia em [`Sources/`](Sources/) |
+
+---
+
+## 🛠 Desenvolvimento
+
+Clone e rode local:
+
+```sh
+git clone https://github.com/JVLegend/PorterIA
+cd PorterIA
+
+make run         # swift run (debug, foreground)
+make app         # build release .app em ./build/PorterIA.app
+make test        # roda os 35+ XCTest
+make clean
+```
+
+Pipeline completo de release (precisa de Apple Developer ID + notarytool profile):
+
+```sh
+make release     # build → sign → dmg → notarize → staple
+```
+
+Veja [`CONTRIBUTING.md`](CONTRIBUTING.md) pra detalhes de PR e estilo de código.
+
+### Stack
+
+- **Swift 6** + **SwiftUI** (`MenuBarExtra`, `SMAppService`)
+- **SwiftPM executable** — sem `.xcodeproj`, tudo reproduzível em texto
+- Macros do sistema: `lsof -F pcnLT`, `ps -o pid=,args=`, `kill(2)`
+- **Sem dependências externas** (no `Package.resolved`)
+
+### Layout do repositório
 
 ```
 PorterIA/
-├── app/         # App Swift de barra de menu (projeto Xcode)
-├── cli/         # Helper CLI opcional em Node (npm) — fase 2
-├── Casks/       # porteria.rb (vive no tap do homebrew depois de publicado)
-└── docs/
+├── Sources/PorterIA/
+│   ├── PorterIAApp.swift          # @main, MenuBarExtra
+│   ├── PortListView.swift         # UI do dropdown
+│   ├── PortScanner.swift          # lsof + parsing + scan loop
+│   ├── AIToolFingerprinter.swift  # catálogo de IA + matcher
+│   ├── LaunchAtLogin.swift        # SMAppService wrapper
+│   └── Models.swift               # PortEntry, AITool
+├── Tests/PorterIATests/           # 35+ XCTest
+├── Resources/
+│   ├── Info.plist
+│   ├── PorterIA.entitlements
+│   └── AppIcon.icns
+└── scripts/                       # build, sign, dmg, notarize, gen-icon
 ```
 
-## Licença
+---
 
-MIT (mesma da inspiração upstream).
+## 📜 Licença
+
+[MIT](LICENSE).
+
+---
+
+<div align="center">
+
+Feito por **[João Victor Dias](https://github.com/JVLegend)** · Reportar bug: [Issues](https://github.com/JVLegend/PorterIA/issues) · Changelog: [CHANGELOG.md](CHANGELOG.md)
+
+</div>

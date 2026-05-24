@@ -1,15 +1,18 @@
 import Foundation
 
 enum PortScanner {
-    /// Top-level scan: lists listening TCP ports with owner + project metadata.
+    /// Top-level scan: lists listening TCP ports with owner + project + AI tool metadata.
     static func scan() -> [PortEntry] {
         let raw = runLsofListen()
         guard let output = raw else { return [] }
         var entries = parse(output)
-        let cwdMap = fetchCwds(for: Set(entries.map(\.pid)))
+        let pidSet = Set(entries.map(\.pid))
+        let cwdMap = fetchCwds(for: pidSet)
+        let cmdMap = AIToolFingerprinter.cmdlines(for: pidSet)
         entries = entries.map { entry in
             let cwd = cwdMap[entry.pid]
             let (root, name) = cwd.flatMap(ProjectDetector.detect) ?? (nil, nil)
+            let aiTool = cmdMap[entry.pid].flatMap(AIToolFingerprinter.match)
             return PortEntry(
                 port: entry.port,
                 pid: entry.pid,
@@ -17,7 +20,8 @@ enum PortScanner {
                 user: entry.user,
                 bindAddress: entry.bindAddress,
                 projectPath: root,
-                projectName: name
+                projectName: name,
+                aiTool: aiTool
             )
         }
         return entries
@@ -65,18 +69,24 @@ enum PortScanner {
         process.executableURL = URL(fileURLWithPath: launchPath)
         process.arguments = arguments
 
-        let pipe = Pipe()
-        process.standardOutput = pipe
-        process.standardError = Pipe()
+        let outPipe = Pipe()
+        process.standardOutput = outPipe
+        // CRITICAL: send stderr to /dev/null. If we use a Pipe() and never
+        // read it, lsof's stderr warnings (denied access to system processes)
+        // fill the 64KB buffer, lsof blocks on write(), waitUntilExit deadlocks,
+        // and the UI shows zero ports. Caught in production after release.
+        process.standardError = FileHandle.nullDevice
 
         do {
             try process.run()
-            process.waitUntilExit()
         } catch {
             return nil
         }
 
-        let data = pipe.fileHandleForReading.readDataToEndOfFile()
+        // Read stdout BEFORE waitUntilExit to avoid the same buffer-fill
+        // deadlock on stdout for unusually large outputs.
+        let data = outPipe.fileHandleForReading.readDataToEndOfFile()
+        process.waitUntilExit()
         return String(data: data, encoding: .utf8)
     }
 

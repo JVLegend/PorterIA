@@ -14,11 +14,13 @@ struct PortEntry: Identifiable, Hashable {
     /// Human-friendly project name (basename of projectPath, or the value of
     /// "name" in package.json when available).
     let projectName: String?
+    /// Identified AI tool (Ollama, Claude Code, Codex, ...), if the owning
+    /// process matches a known fingerprint. Defaults to nil so existing
+    /// memberwise initializers (and tests) keep working.
+    var aiTool: AITool? = nil
 
     /// Human-friendly bind label: "all interfaces", "localhost", or the literal host.
     var bindLabel: String {
-        // Take everything before the last ':' (which separates host from port).
-        // Using lastIndex avoids mangling IPv6 like "[::1]:8080".
         guard let lastColon = bindAddress.lastIndex(of: ":") else { return bindAddress }
         let host = String(bindAddress[..<lastColon])
         switch host {
@@ -32,16 +34,20 @@ struct PortEntry: Identifiable, Hashable {
     }
 
     /// Best-effort display title for the row.
-    /// Example: "next-app" (when project detected) or "node" (fallback).
-    var primaryLabel: String { projectName ?? command }
+    /// Priority: AI tool name > project name > raw command.
+    var primaryLabel: String {
+        if let tool = aiTool { return tool.displayName }
+        return projectName ?? command
+    }
 
     /// Secondary text under the primary label.
-    /// Example: "node · pid 1234 · localhost" when project name is present,
-    /// otherwise "pid 1234 · localhost".
     var secondaryLabel: String {
-        if projectName != nil {
-            return "\(command) · pid \(pid) · \(bindLabel)"
+        var parts: [String] = []
+        if aiTool != nil || projectName != nil {
+            parts.append(command)
         }
-        return "pid \(pid) · \(bindLabel)"
+        parts.append("pid \(pid)")
+        parts.append(bindLabel)
+        return parts.joined(separator: " · ")
     }
 }

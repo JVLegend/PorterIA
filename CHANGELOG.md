@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-05-23
+
+### Added
+- **AI tools detection** — rows for processes recognized as AI dev tools now show a colored `AI` badge and friendlier name. Catalog covers: Ollama, LM Studio, vLLM, Claude Code, Codex CLI, Aider, Goose, Open Interpreter, Continue.dev, GitHub Copilot, Cursor, Tabby, LiteLLM, Claude Desktop, Jupyter, VS Code Server. Implemented as regex match against full `ps -p PID -o args=` output in `AIToolFingerprinter`.
+- **Filter toggle** in the header: switch between `All` and `AI` views. `AI` shows only ports owned by recognized AI tooling.
+- **AI count badge** in the header when at least one AI tool is detected.
+- **Launch at Login toggle** in the footer (powered by `SMAppService.mainApp`). One-click enable / disable, persists across reboots, no system settings round-trip.
+- 20 new `AIToolFingerprinterTests` covering all catalog entries + ps output parsing edge cases. Test suite now at 35 total.
+
+### Changed
+- `PortEntry.primaryLabel` now prefers the AI tool display name over the project name and raw command.
+- Per-category badge colors: LLM servers = orange, agents = purple, IDE extensions = blue, proxies = teal, desktop apps = green, notebooks = pink, remote dev = gray.
+
+### Fixed
+- **Critical: zero ports shown after install.** `runProcess` piped stderr without ever reading it, and `lsof` writes warnings to stderr (denied access to system processes). The 64KB stderr buffer filled, `lsof` blocked on `write()`, `waitUntilExit()` deadlocked, `scan()` never returned, and the dropdown showed nothing. Fix: route stderr to `FileHandle.nullDevice` and read stdout before waiting on exit. Same fix applied to `AIToolFingerprinter.cmdlines()`.
+- README reorganized: Install before Build, badges, AI catalog table, privacy table, GitHub Topics shields. Polished for technical audience. Same treatment in `README_en.md`.
+
 ## [0.3.0] - 2026-05-23
 
 ### Added
@@ -49,7 +66,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Signed and notarized `.dmg` distribution via the `make release` pipeline.
 - Homebrew Cask `porteria` available through the `jvlegend/porteria` tap.
 
-[Unreleased]: https://github.com/JVLegend/PorterIA/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/JVLegend/PorterIA/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/JVLegend/PorterIA/releases/tag/v0.4.0
 [0.3.0]: https://github.com/JVLegend/PorterIA/releases/tag/v0.3.0
 [0.2.0]: https://github.com/JVLegend/PorterIA/releases/tag/v0.2.0
 [0.1.0]: https://github.com/JVLegend/PorterIA/releases/tag/v0.1.0

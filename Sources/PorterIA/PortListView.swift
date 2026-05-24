@@ -29,10 +29,29 @@ final class PortStore: ObservableObject {
     }
 }
 
+enum PortFilter: String, CaseIterable, Identifiable {
+    case all = "All"
+    case aiOnly = "AI"
+    var id: String { rawValue }
+}
+
 // MARK: - Root view
 
 struct PortListView: View {
     @ObservedObject var store: PortStore
+    @StateObject private var launchAtLogin = LaunchAtLoginController()
+    @State private var filter: PortFilter = .all
+
+    private var filteredEntries: [PortEntry] {
+        switch filter {
+        case .all: return store.entries
+        case .aiOnly: return store.entries.filter { $0.aiTool != nil }
+        }
+    }
+
+    private var aiCount: Int {
+        store.entries.filter { $0.aiTool != nil }.count
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -53,8 +72,31 @@ struct PortListView: View {
                 .foregroundStyle(.tint)
             Text("PorterIA")
                 .font(.system(size: 13, weight: .semibold))
+
+            if aiCount > 0 {
+                Text("\(aiCount) AI")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 5)
+                    .padding(.vertical, 1)
+                    .background(
+                        RoundedRectangle(cornerRadius: 4)
+                            .fill(Color.purple.opacity(0.85))
+                    )
+            }
+
             Spacer()
-            Text("\(store.entries.count)")
+
+            Picker("", selection: $filter) {
+                ForEach(PortFilter.allCases) { f in
+                    Text(f.rawValue).tag(f)
+                }
+            }
+            .pickerStyle(.segmented)
+            .frame(width: 100)
+            .controlSize(.mini)
+
+            Text("\(filteredEntries.count)")
                 .font(.system(size: 11, weight: .semibold))
                 .monospacedDigit()
                 .foregroundStyle(.secondary)
@@ -69,21 +111,21 @@ struct PortListView: View {
         .padding(.vertical, 10)
     }
 
-    /// Approximate height of one PortRowView (padding 8+8 + content ~30).
     private static let rowHeight: CGFloat = 46
     private static let minVisibleRows: CGFloat = 4
     private static let maxVisibleRows: CGFloat = 8
 
     @ViewBuilder
     private var content: some View {
-        if store.entries.isEmpty {
+        let list = filteredEntries
+        if list.isEmpty {
             emptyState
         } else {
             ScrollView {
                 LazyVStack(spacing: 0) {
-                    ForEach(Array(store.entries.enumerated()), id: \.element.id) { index, entry in
+                    ForEach(Array(list.enumerated()), id: \.element.id) { index, entry in
                         PortRowView(entry: entry) { store.kill(entry) }
-                        if index < store.entries.count - 1 {
+                        if index < list.count - 1 {
                             Divider().padding(.leading, 12)
                         }
                     }
@@ -98,10 +140,10 @@ struct PortListView: View {
 
     private var emptyState: some View {
         VStack(spacing: 6) {
-            Image(systemName: "checkmark.circle")
+            Image(systemName: filter == .aiOnly ? "sparkles" : "checkmark.circle")
                 .font(.system(size: 22))
                 .foregroundStyle(.secondary)
-            Text("No listening TCP ports")
+            Text(filter == .aiOnly ? "No AI tools detected" : "No listening TCP ports")
                 .font(.system(size: 12))
                 .foregroundStyle(.secondary)
         }
@@ -127,6 +169,18 @@ struct PortListView: View {
 
             Spacer()
 
+            if launchAtLogin.isManageable {
+                Toggle(isOn: Binding(
+                    get: { launchAtLogin.isEnabled },
+                    set: { _ in launchAtLogin.toggle() }
+                )) {
+                    Text("Start at login")
+                        .font(.system(size: 10))
+                }
+                .toggleStyle(.switch)
+                .controlSize(.mini)
+            }
+
             Button("Quit") { NSApp.terminate(nil) }
                 .buttonStyle(.borderless)
                 .font(.system(size: 11))
@@ -134,6 +188,7 @@ struct PortListView: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
+        .onAppear { launchAtLogin.refresh() }
     }
 
     private var relativeRefreshLabel: String {
@@ -160,10 +215,15 @@ private struct PortRowView: View {
                 .frame(width: 56, alignment: .leading)
 
             VStack(alignment: .leading, spacing: 1) {
-                Text(entry.primaryLabel)
-                    .font(.system(size: 12, weight: .medium))
-                    .lineLimit(1)
-                    .truncationMode(.tail)
+                HStack(spacing: 4) {
+                    if let tool = entry.aiTool {
+                        AIBadge(category: tool.category)
+                    }
+                    Text(entry.primaryLabel)
+                        .font(.system(size: 12, weight: .medium))
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                }
                 Text(entry.secondaryLabel)
                     .font(.system(size: 10))
                     .foregroundStyle(.secondary)
@@ -186,5 +246,36 @@ private struct PortRowView: View {
         .contentShape(Rectangle())
         .background(hovering ? Color.secondary.opacity(0.08) : Color.clear)
         .onHover { hovering = $0 }
+    }
+}
+
+/// Small colored capsule shown next to the primary label when the row's
+/// process matches a known AI tool. Colored per category to make the type
+/// scannable at a glance.
+private struct AIBadge: View {
+    let category: AIToolCategory
+
+    var body: some View {
+        Text("AI")
+            .font(.system(size: 9, weight: .bold))
+            .foregroundStyle(.white)
+            .padding(.horizontal, 4)
+            .padding(.vertical, 1)
+            .background(
+                RoundedRectangle(cornerRadius: 3)
+                    .fill(color)
+            )
+    }
+
+    private var color: Color {
+        switch category {
+        case .llmServer:    return .orange
+        case .aiAgent:      return .purple
+        case .aiProxy:      return .teal
+        case .ideExtension: return .blue
+        case .desktopApp:   return .green
+        case .notebook:     return .pink
+        case .remoteDev:    return .gray
+        }
     }
 }
