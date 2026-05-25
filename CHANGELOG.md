@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-05-23
+
+### Added
+- **🕐 Port history + Recently freed section.** New in-memory `PortHistoryStore` tracks (port, pid, command, projectName, firstSeen, lastSeen) tuples for the last 30 minutes. A "RECENTLY FREED" section appears between the port list and the AI section showing ports that had a process within the last 5 minutes but aren't currently bound. Each row shows the project/command, when it was freed (e.g. "freed 2m ago"), and a hover-only pin button to keep watching the port.
+- 7 new `PortHistoryTests` covering same-owner bumps `lastSeen`, owner-change appends, per-port cap (5), 30min pruning, recently-freed filtering, `observe(entries)` integration, and time-ago formatting. Suite at **56 tests**.
+
+### Changed
+- `PortStore.refresh` now also feeds the history store and recomputes `recentlyFreed` after each scan.
+
 ## [0.7.0] - 2026-05-23
 
 ### Added
@@ -105,7 +114,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Signed and notarized `.dmg` distribution via the `make release` pipeline.
 - Homebrew Cask `porteria` available through the `jvlegend/porteria` tap.
 
-[Unreleased]: https://github.com/JVLegend/PorterIA/compare/v0.7.0...HEAD
+[Unreleased]: https://github.com/JVLegend/PorterIA/compare/v0.8.0...HEAD
+[0.8.0]: https://github.com/JVLegend/PorterIA/releases/tag/v0.8.0
 [0.7.0]: https://github.com/JVLegend/PorterIA/releases/tag/v0.7.0
 [0.6.0]: https://github.com/JVLegend/PorterIA/releases/tag/v0.6.0
 [0.5.0]: https://github.com/JVLegend/PorterIA/releases/tag/v0.5.0

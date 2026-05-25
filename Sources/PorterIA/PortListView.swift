@@ -5,7 +5,9 @@ import AppKit
 final class PortStore: ObservableObject {
     @Published var entries: [PortEntry] = []
     @Published var aiProcessesWithoutPort: [AIProcess] = []
+    @Published var recentlyFreed: [PortHistoryEntry] = []
     @Published var lastRefresh: Date = Date()
+    let history = PortHistoryStore()
     private var timer: Timer?
 
     func startAutoRefresh() {
@@ -23,6 +25,9 @@ final class PortStore: ObservableObject {
             await MainActor.run {
                 self.entries = scanned
                 self.aiProcessesWithoutPort = aiOnly
+                self.history.observe(scanned)
+                let boundPorts = Set(scanned.map(\.port))
+                self.recentlyFreed = self.history.recentlyFreed(currentlyBound: boundPorts)
                 self.lastRefresh = Date()
             }
         }
@@ -120,6 +125,10 @@ struct PortListView: View {
             }
             Divider()
             content
+            if !store.recentlyFreed.isEmpty {
+                Divider()
+                recentlyFreedSection
+            }
             if !store.aiProcessesWithoutPort.isEmpty {
                 Divider()
                 aiProcessSection
@@ -298,6 +307,32 @@ struct PortListView: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 24)
+    }
+
+    private var recentlyFreedSection: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 6) {
+                Image(systemName: "clock.arrow.circlepath")
+                    .font(.system(size: 10))
+                    .foregroundStyle(.cyan)
+                Text("Recently freed")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(.secondary)
+                    .textCase(.uppercase)
+                Spacer()
+                Text("\(store.recentlyFreed.count)")
+                    .font(.system(size: 10, weight: .semibold))
+                    .monospacedDigit()
+                    .foregroundStyle(.secondary)
+            }
+            .padding(.horizontal, 12)
+            .padding(.top, 6)
+            .padding(.bottom, 2)
+
+            ForEach(store.recentlyFreed) { entry in
+                RecentlyFreedRow(entry: entry) { pinStore.toggle(entry.port) }
+            }
+        }
     }
 
     private var aiProcessSection: some View {
@@ -546,6 +581,54 @@ private struct StatsChip: View {
 
     private func format(_ v: Double) -> String {
         v < 10 ? String(format: "%.1f", v) : String(Int(v.rounded()))
+    }
+}
+
+// MARK: - Recently freed row
+
+private struct RecentlyFreedRow: View {
+    let entry: PortHistoryEntry
+    let onPin: () -> Void
+    @State private var hovering = false
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Text("\(entry.port)")
+                .font(.system(size: 13, weight: .semibold, design: .monospaced))
+                .monospacedDigit()
+                .foregroundStyle(.secondary)
+                .frame(width: 56, alignment: .leading)
+
+            VStack(alignment: .leading, spacing: 0) {
+                Text(entry.projectName ?? entry.command)
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                Text("\(entry.command) · freed \(entry.timeAgo())")
+                    .font(.system(size: 9))
+                    .foregroundStyle(.tertiary)
+                    .lineLimit(1)
+            }
+
+            Spacer(minLength: 4)
+
+            if hovering {
+                Button(action: onPin) {
+                    Image(systemName: "pin")
+                        .font(.system(size: 10))
+                        .foregroundStyle(Color.secondary.opacity(0.6))
+                        .rotationEffect(.degrees(45))
+                }
+                .buttonStyle(.plain)
+                .help("Pin this port so it stays visible")
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 4)
+        .contentShape(Rectangle())
+        .background(hovering ? Color.secondary.opacity(0.06) : Color.clear)
+        .onHover { hovering = $0 }
+        .opacity(0.85)
     }
 }
 
