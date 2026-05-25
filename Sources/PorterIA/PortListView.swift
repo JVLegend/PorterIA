@@ -56,9 +56,12 @@ struct PortListView: View {
     @ObservedObject var store: PortStore
     @StateObject private var launchAtLogin = LaunchAtLoginController()
     @StateObject private var pinStore = PinStore()
+    @StateObject private var mcpServer = MCPServer()
     @State private var filter: PortFilter = .all
     @State private var searchText: String = ""
+    @State private var showingMCPInfo = false
     @AppStorage("PorterIA.groupByProject") private var groupByProject: Bool = false
+    @AppStorage("PorterIA.mcpAutoStart") private var mcpAutoStart: Bool = false
 
     private var filteredEntries: [PortEntry] {
         let base: [PortEntry]
@@ -362,7 +365,7 @@ struct PortListView: View {
     }
 
     private var footer: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: 10) {
             Button {
                 store.refresh()
             } label: {
@@ -379,12 +382,30 @@ struct PortListView: View {
 
             Spacer()
 
+            // MCP server toggle — click toggles, hover shows status
+            Button {
+                if mcpServer.isRunning { mcpServer.stop() } else { mcpServer.start() }
+            } label: {
+                HStack(spacing: 3) {
+                    Circle()
+                        .fill(mcpServer.isRunning ? Color.green : Color.secondary.opacity(0.4))
+                        .frame(width: 6, height: 6)
+                    Text("MCP")
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundStyle(mcpServer.isRunning ? Color.primary : Color.secondary)
+                }
+            }
+            .buttonStyle(.plain)
+            .help(mcpServer.isRunning
+                  ? "MCP server running on http://localhost:\(mcpServer.port)/mcp — click to stop"
+                  : "Start MCP server so Claude Code / Codex can query ports")
+
             if launchAtLogin.isManageable {
                 Toggle(isOn: Binding(
                     get: { launchAtLogin.isEnabled },
                     set: { _ in launchAtLogin.toggle() }
                 )) {
-                    Text("Start at login")
+                    Text("Login")
                         .font(.system(size: 10))
                 }
                 .toggleStyle(.switch)
@@ -398,7 +419,13 @@ struct PortListView: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
-        .onAppear { launchAtLogin.refresh() }
+        .onAppear {
+            launchAtLogin.refresh()
+            mcpServer.store = store
+            if mcpAutoStart && !mcpServer.isRunning {
+                mcpServer.start()
+            }
+        }
     }
 
     private var relativeRefreshLabel: String {

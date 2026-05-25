@@ -29,7 +29,13 @@
 | 🚀 **Iniciar no login** | Toggle integrado via `SMAppService` |
 | 🔄 **Auto-refresh a cada 5 segundos** | Mais `⌘R` pra atualização manual |
 | 💎 **Universal binary** | Roda nativo em Apple Silicon e Intel |
-| 🔒 **Privacidade total** | Sem rede, sem telemetria, sem privilégio elevado, sem disco. Só `lsof` + `kill(2)` |
+| 📌 **Pin / watchlist** | Marque portas favoritas (3000, 5432) — ficam sempre no topo e indicam quando estão livres |
+| 🗂 **Group by project** | Toggle no header para agrupar portas por projeto |
+| 🕐 **Recently freed** | Mostra portas que tinham processo no último 5min mas estão livres agora |
+| 🔍 **Search / filter** | Busca por porta, processo, projeto ou nome de ferramenta de IA |
+| 📋 **Copy URL** | 1 clique copia `http://localhost:PORT` |
+| 🤖 **Servidor MCP embutido** | Claude Code / Codex / qualquer agente MCP podem perguntar "quais portas estão em uso?" — toggle no rodapé |
+| 🔒 **Privacidade total** | Sem rede outbound, sem telemetria, sem privilégio elevado, sem disco. Só `lsof` + `kill(2)` + servidor MCP local (127.0.0.1, nunca LAN) |
 | ✅ **Assinado e notarizado pela Apple** | Distribuído via Developer ID, sem bloqueio do Gatekeeper |
 
 ---
@@ -109,11 +115,47 @@ Não viu sua ferramenta? [Abre uma issue](https://github.com/JVLegend/PorterIA/i
 
 ---
 
+## 🤖 Servidor MCP (Claude Code / Codex)
+
+Desde a v0.9, o PorterIA expõe sua inteligência de portas como um **servidor MCP** local. Qualquer agente compatível com Model Context Protocol (Claude Code, Codex, etc.) pode perguntar coisas como *"quais portas eu estou usando?"*, *"quem está na :3000?"*, *"mata o processo da :5432"*.
+
+### Como ligar
+
+1. Clique no toggle **MCP** no rodapé da janela (bolinha verde = rodando)
+2. Adicione ao `~/Library/Application Support/Claude/claude_desktop_config.json` (Claude Desktop) ou ao config do Codex:
+
+```json
+{
+  "mcpServers": {
+    "porteria": {
+      "type": "http",
+      "url": "http://localhost:9876/mcp"
+    }
+  }
+}
+```
+
+3. Reinicie o Claude Desktop / Codex
+4. Pergunte: *"Use o porteria pra me listar as portas em uso. Tem alguma ferramenta de IA rodando?"*
+
+### Tools expostas
+
+| Tool | O que faz |
+|---|---|
+| `list_ports` | Todas as portas TCP em escuta, com processo, projeto, AI tool, CPU%, bind |
+| `find_port` | Detalhe completo de uma porta específica |
+| `list_ai_tools` | Ferramentas de IA ativas (com porta E sem porta) |
+| `list_recently_freed` | Portas que tinham processo no último 5min e estão livres agora |
+| `kill_port` | SIGTERM no processo dono de uma porta |
+
+O servidor escuta apenas em `127.0.0.1:9876` — **nunca exposto pra rede local**. Sem auth (assume confiança no localhost).
+
 ## 🔒 Privacidade
 
 | Item | Status |
 |---|---|
 | Conexões de rede de saída | ❌ **Nunca** |
+| Servidor MCP (quando ligado) | ✅ Só `127.0.0.1:9876` — nunca exposto pra LAN |
 | Telemetria / analytics | ❌ **Nunca** |
 | Acesso a disco persistente | ❌ **Nada** (sem cache, sem config gravada) |
 | Privilégios elevados (sudo / TCC) | ❌ **Não pede** |

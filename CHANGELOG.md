@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-05-23
+
+### Added — 🤖 MCP server (killer feature)
+
+PorterIA now exposes its port intelligence to AI agents over the **Model Context Protocol**. Claude Code, Codex, and any MCP-compatible client can ask PorterIA: *"which ports are in use?"*, *"who's on :3000?"*, *"kill the process on :5432"*, *"which AI tools are running?"*, *"what was freed recently?"*.
+
+- New `MCPServer` class powered by `Network.framework` `NWListener` on `localhost:9876` (bound to 127.0.0.1, never exposed to LAN). Hand-rolled HTTP/JSON-RPC 2.0 parser — no external deps.
+- **5 tools** exposed:
+  - `list_ports` — all listening TCP ports with command/PID/project/AI tool/CPU%/bind
+  - `find_port` — full details for a specific port
+  - `list_ai_tools` — both port-binding and stdio-only AI processes
+  - `list_recently_freed` — ports active in the last 5min that just freed
+  - `kill_port` — SIGTERM the owner of a port
+- **Toggle in the footer** (green dot when running) — click to start/stop. `@AppStorage("PorterIA.mcpAutoStart")` available to auto-start on launch.
+- 6 new `MCPServerHTTPParserTests` covering GET/POST parsing, incomplete bodies, response formatting. Suite at **62 tests**.
+
+### How to wire up
+
+Add to `~/Library/Application Support/Claude/claude_desktop_config.json` (or Codex equivalent):
+```json
+{
+  "mcpServers": {
+    "porteria": { "type": "http", "url": "http://localhost:9876/mcp" }
+  }
+}
+```
+
+Then ask Claude: *"Which ports am I using? Are any of them AI tools?"*
+
 ## [0.8.0] - 2026-05-23
 
 ### Added
@@ -114,7 +143,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Signed and notarized `.dmg` distribution via the `make release` pipeline.
 - Homebrew Cask `porteria` available through the `jvlegend/porteria` tap.
 
-[Unreleased]: https://github.com/JVLegend/PorterIA/compare/v0.8.0...HEAD
+[Unreleased]: https://github.com/JVLegend/PorterIA/compare/v0.9.0...HEAD
+[0.9.0]: https://github.com/JVLegend/PorterIA/releases/tag/v0.9.0
 [0.8.0]: https://github.com/JVLegend/PorterIA/releases/tag/v0.8.0
 [0.7.0]: https://github.com/JVLegend/PorterIA/releases/tag/v0.7.0
 [0.6.0]: https://github.com/JVLegend/PorterIA/releases/tag/v0.6.0
